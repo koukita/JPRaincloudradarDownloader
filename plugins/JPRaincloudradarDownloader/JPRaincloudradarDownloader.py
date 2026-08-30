@@ -33,7 +33,6 @@ from .LightningDataDownloader import run_lightning_process
 import requests
 
 
-ZOOM_LEVEL = 10
 RASTER_OPACITY = 0.7
 HTTP_TIMEOUT = 30
 DOWNLOAD_RETRY_COUNT = 3
@@ -212,7 +211,7 @@ def download_and_merge_tiles(base_utc_str, target_utc_str, extent_3857, zoom, te
     total = count_x * count_y
 
     if total <= 0 or total > MAX_TILE_COUNT:
-        raise RuntimeError(f"タイル数が多すぎます（{total}枚）。範囲を狭めてください。")
+        raise RuntimeError(f"タイル数が多すぎます（{total}枚）。範囲を狭めるか、ズームレベルを下げてください。")
 
     mosaic = QImage(count_x * TILE_SIZE, count_y * TILE_SIZE, QImage.Format.Format_ARGB32)
     mosaic.fill(Qt.GlobalColor.transparent)
@@ -334,7 +333,7 @@ def add_gpkg_layer_with_temporal(gpkg_path, table_name, layer_name, jst_time, gr
     return layer
 
 
-def run_nowcast_process(base_jst, hours_back, extent_3857):
+def run_nowcast_process(base_jst, hours_back, extent_3857, zoom):
     n2_data = get_n2_target_times()
     n2_map, n2_latest_base = extract_basetime_map(n2_data)
 
@@ -391,7 +390,7 @@ def run_nowcast_process(base_jst, hours_back, extent_3857):
         progress.setLabelText(f"{jst_dt.strftime('%Y/%m/%d %H:%M')} JST を処理中")
 
         mosaic_png, mosaic_bounds = download_and_merge_tiles(
-            base_utc_str, target_utc_str, extent_3857, ZOOM_LEVEL, temp_dir
+            base_utc_str, target_utc_str, extent_3857, zoom, temp_dir
         )
         if not mosaic_png:
             print(f"No mosaic for {target_utc_str}")
@@ -402,7 +401,7 @@ def run_nowcast_process(base_jst, hours_back, extent_3857):
             mosaic_bounds,
             extent_3857,
             target_utc_str,
-            ZOOM_LEVEL,
+            zoom,
             gpkg_path,
             temp_dir
         )
@@ -490,9 +489,10 @@ class JPRaincloudradarDownloader:
         if self.dock is None:
             self.dock = JPRaincloudradarDownloaderDialog()
 
-            dock_area = Qt.DockWidgetArea.LeftDockWidgetArea
+            dock_area = Qt.DockWidgetArea.RightDockWidgetArea
             self.iface.addDockWidget(dock_area, self.dock)
 
+            # 初回生成時のみ、現在日時・基準時間・取得時間を初期セット
             now = datetime.utcnow() + timedelta(hours=9)
             rounded_min = (now.minute // 5) * 5
 
@@ -501,12 +501,26 @@ class JPRaincloudradarDownloader:
             self.dock.lineEdit_min.setText(str(rounded_min))
             self.dock.lineEdit_hours_back.setText("1")
 
-            canvas = iface.mapCanvas()
-            self.dock.extentWidget.setMapCanvas(canvas)
-            self.dock.extentWidget.setOutputExtentFromCurrent()
-
             self.dock.button_download.clicked.connect(self.start_download)
             self.dock.button_download_lightning.clicked.connect(self.start_lightning_download)
+
+        # パネルを開くたびに領域座標とズームレベルのみを更新
+        canvas = iface.mapCanvas()
+        self.dock.extentWidget.setMapCanvas(canvas)
+        self.dock.extentWidget.setOutputExtentFromCurrent()
+
+        current_scale = canvas.scale()
+
+        if current_scale > 10000000:
+            default_zoom = 4
+        elif current_scale > 5000000:
+            default_zoom = 6
+        elif current_scale > 1000000:
+            default_zoom = 8
+        else:
+            default_zoom = 10
+
+        self.dock.spinBox_zoom.setValue(default_zoom)
 
         self.dock.show()
 
@@ -516,6 +530,7 @@ class JPRaincloudradarDownloader:
             hour = int(self.dock.lineEdit_hour.text())
             minute = int(self.dock.lineEdit_min.text())
             hours_back = int(self.dock.lineEdit_hours_back.text())
+            zoom = self.dock.spinBox_zoom.value()
 
             base_jst = datetime(date.year, date.month, date.day, hour, minute, 0)
 
@@ -529,7 +544,7 @@ class JPRaincloudradarDownloader:
 
             extent_3857 = transform_rect_to_3857(rect, src_crs)
 
-            run_nowcast_process(base_jst, hours_back, extent_3857)
+            run_nowcast_process(base_jst, hours_back, extent_3857, zoom)
 
         except Exception as e:
             QMessageBox.critical(self.iface.mainWindow(), "エラー", str(e))

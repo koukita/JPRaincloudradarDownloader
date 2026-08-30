@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timedelta
 
-from qgis.PyQt.QtCore import QDateTime, QCoreApplication, QVariant, Qt
+from qgis.PyQt.QtCore import QDate, QDateTime, QTime, QTimeZone, QCoreApplication, QVariant, Qt
 from qgis.PyQt.QtWidgets import QProgressDialog, QMessageBox, QDockWidget
 from qgis.gui import QgsTemporalControllerWidget
 from qgis.utils import iface
@@ -26,6 +26,43 @@ from qgis.core import (
 
 def process_events():
     QCoreApplication.processEvents()
+
+
+def make_utc_qdatetime(value):
+    """Python datetime から UTC タイムゾーンの QDateTime を生成する。"""
+    return QDateTime(
+        QDate(value.year, value.month, value.day),
+        QTime(value.hour, value.minute, value.second),
+        Qt.TimeSpec.UTC,
+    )
+
+
+JST_TIME_ZONE = QTimeZone(b"Asia/Tokyo")
+
+
+def make_jst_qdatetime(value, fallback):
+    """GeoJSON の obstimeJST を日時型（Asia/Tokyo）へ正規化する。"""
+    if isinstance(value, QDateTime) and value.isValid():
+        return QDateTime(value.date(), value.time(), JST_TIME_ZONE)
+
+    if isinstance(value, datetime):
+        return QDateTime(
+            QDate(value.year, value.month, value.day),
+            QTime(value.hour, value.minute, value.second, value.microsecond // 1000),
+            JST_TIME_ZONE,
+        )
+
+    text = str(value)
+    for date_format in ("yyyy/MM/dd HH:mm:ss.zzz", "yyyy/MM/dd HH:mm:ss"):
+        parsed = QDateTime.fromString(text, date_format)
+        if parsed.isValid():
+            return QDateTime(parsed.date(), parsed.time(), JST_TIME_ZONE)
+
+    return QDateTime(
+        QDate(fallback.year, fallback.month, fallback.day),
+        QTime(fallback.hour, fallback.minute, fallback.second),
+        JST_TIME_ZONE,
+    )
 
 def apply_lightning_style(layer):
     """雷カテゴリに応じたスタイル設定（対地放電: 四角, 雲放電: バツ）"""
@@ -90,6 +127,8 @@ def run_lightning_process(base_jst, hours_back):
     processed_count = 0
     total_features = 0
     fields_initialized = False
+    source_field_names = []
+    source_jst_index = -1
 
     for idx, jst_dt in enumerate(time_steps_jst):
         process_events()
@@ -109,22 +148,38 @@ def run_lightning_process(base_jst, hours_back):
         if not temp_layer.isValid() or temp_layer.featureCount() == 0:
             continue
 
-        # 初回ヒット時にフィールド構造を初期化（obstimeUTC を日付時刻型で追加）
+        # 初回ヒット時に出力フィールドを明示的に定義する。
+        # 元の obstimeJST は保存せず、「日本時間」へ置き換える。
         if not fields_initialized:
-            new_fields = temp_layer.fields()
-            new_fields.append(QgsField("obstimeUTC", QVariant.DateTime))
-            pr.addAttributes(new_fields)
+            source_jst_index = temp_layer.fields().indexFromName("obstimeJST")
+            source_field_names = [
+                field.name()
+                for field in temp_layer.fields()
+                if field.name() != "obstimeJST"
+            ]
+            output_fields = [
+                QgsField("obstimeUTC", QVariant.DateTime),
+                QgsField("日本時間", QVariant.DateTime),
+            ]
+            output_fields.extend(
+                temp_layer.fields().at(temp_layer.fields().indexFromName(name))
+                for name in source_field_names
+            )
+            pr.addAttributes(output_fields)
             combined_layer.updateFields()
             fields_initialized = True
 
-        # 「2026/08/30 13:09:04 (UTC)」形式の文字列を作成してQDateTimeに変換
-        utc_formatted_str = target_utc_dt.strftime("%Y/%m/%d %H:%M:%S (UTC)")
-        qdt_utc = QDateTime.fromString(utc_formatted_str, "yyyy/MM/dd HH:mm:ss (UTC)")
+        # UTC の TimeSpec を明示する。fromString() は既定ではローカル時刻（JST）として
+        # 解釈されるため使用しない。
+        qdt_utc = make_utc_qdatetime(target_utc_dt)
 
         new_features = []
 
         for feat in temp_layer.getFeatures():
-            attrs = feat.attributes() + [qdt_utc]
+            # GeoJSON の obstimeJST を、日本時間の日時型フィールドとして保存する。
+            jst_value = feat.attribute(source_jst_index) if source_jst_index >= 0 else ""
+            attrs = [qdt_utc, make_jst_qdatetime(jst_value, jst_dt)]
+            attrs.extend(feat[name] for name in source_field_names)
             new_feat = QgsFeature(combined_layer.fields())
             new_feat.setGeometry(feat.geometry())
             new_feat.setAttributes(attrs)
@@ -193,14 +248,8 @@ def run_lightning_process(base_jst, hours_back):
                 start_utc_dt = time_steps_jst[0] - timedelta(hours=9)
                 end_utc_dt = time_steps_jst[-1] - timedelta(hours=9)
 
-                start_qdt = QDateTime(
-                    start_utc_dt.year, start_utc_dt.month, start_utc_dt.day,
-                    start_utc_dt.hour, start_utc_dt.minute, start_utc_dt.second
-                )
-                end_qdt = QDateTime(
-                    end_utc_dt.year, end_utc_dt.month, end_utc_dt.day,
-                    end_utc_dt.hour, end_utc_dt.minute, end_utc_dt.second
-                ).addSecs(4 * 60 + 59)
+                start_qdt = make_utc_qdatetime(start_utc_dt)
+                end_qdt = make_utc_qdatetime(end_utc_dt).addSecs(4 * 60 + 59)
 
                 total_range = QgsDateTimeRange(start_qdt, end_qdt)
                 interval = QgsInterval(5, Qgis.TemporalUnit.Minutes)

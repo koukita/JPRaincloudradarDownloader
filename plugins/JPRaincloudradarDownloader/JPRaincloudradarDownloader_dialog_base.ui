@@ -53,20 +53,61 @@
      <widget class="QgsExtentGroupBox" name="extentWidget"/>
     </item>
 
+   <item>
+     <layout class="QHBoxLayout" name="zoomLayout">
+      <item>
+       <widget class="QLabel" name="label_zoom">
+        <property name="text">
+         <string>ズームレベル（偶数のみ、最大10）</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="spinBox_zoom">
+        <property name="minimum">
+         <number>2</number>
+        </property>
+        <property name="maximum">
+         <number>10</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+        <property name="value">
+         <number>10</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>   
+
       <item>
          <widget class="QPushButton" name="button_download">
          <property name="text"><string>雨雲レーダー画像取得</string></property>
-      </widget>
+         </widget>
       </item>
       <item>
          <widget class="QPushButton" name="button_download_lightning">
-         <property name="text"><string>雷データ取得</string></property>
-      </widget>
-      </item>
+            <property name="text"><string>雷データ取得</string></property>
+         </widget>
+         </item>
 
-   </layout>
-  </widget>
- </widget>
+         <item>
+         <spacer name="verticalSpacer">
+            <property name="orientation">
+            <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+            <size>
+            <width>20</width>
+            <height>40</height>
+            </size>
+            </property>
+         </spacer>
+         </item>
+         </layout>
+      </widget>
+   </widget>
 
  <customwidgets>
     <customwidget>
