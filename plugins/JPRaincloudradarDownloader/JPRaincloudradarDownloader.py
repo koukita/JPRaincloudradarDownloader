@@ -4,6 +4,7 @@ import os
 import json
 import shutil
 import urllib.request
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
 from osgeo import gdal, osr
@@ -27,6 +28,9 @@ from qgis.gui import QgsTemporalControllerWidget
 from qgis.utils import iface
 
 from .JPRaincloudradarDownloader_dialog import JPRaincloudradarDownloaderDialog
+from .LightningDataDownloader import run_lightning_process
+
+import requests
 
 
 ZOOM_LEVEL = 10
@@ -42,28 +46,27 @@ def process_events():
     QCoreApplication.processEvents()
 
 
-def create_http_request(url):
-    return urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 QGIS-JMA-Nowcast",
-            "Accept": "image/png,image/*,application/json,*/*",
-            "Connection": "close"
-        }
-    )
+def safe_get(url, timeout):
+    """安全な HTTP GET（http/https のみ許可）"""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
+    res = requests.get(url, timeout=timeout)
+    res.raise_for_status()
+    return res
 
 
 def get_json(url):
-    req = create_http_request(url)
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
-        return json.loads(res.read().decode("utf-8"))
+    res = safe_get(url, timeout=HTTP_TIMEOUT)
+    return res.json()
 
 
 def get_n2_target_times():
     """未来（N2）のJSONデータを取得"""
     try:
         return get_json("https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json")
-    except Exception:
+    except Exception as e:
+        print(f"Error loading N2 target times: {e}")
         return None
 
 
@@ -107,23 +110,27 @@ def extract_basetime_map(json_data):
 def download_png(url, output_path):
     for _ in range(DOWNLOAD_RETRY_COUNT):
         try:
-            req = create_http_request(url)
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
-                data = res.read()
+            res = safe_get(url, timeout=HTTP_TIMEOUT)
+            data = res.content
 
             if len(data) < 8 or data[:8] != b"\x89PNG\r\n\x1a\n":
+                print("Invalid PNG header")
                 continue
 
             with open(output_path, "wb") as f:
                 f.write(data)
 
             if QImage(output_path).isNull():
+                print("Downloaded PNG is invalid")
                 os.remove(output_path)
                 continue
 
             return True
-        except Exception:
-            pass
+
+        except Exception as e:
+            print(f"Download error: {e}")
+            continue
+
     return False
 
 
@@ -208,9 +215,7 @@ def download_and_merge_tiles(base_utc_str, target_utc_str, extent_3857, zoom, te
         raise RuntimeError(f"タイル数が多すぎます（{total}枚）。範囲を狭めてください。")
 
     mosaic = QImage(count_x * TILE_SIZE, count_y * TILE_SIZE, QImage.Format.Format_ARGB32)
-    
-    transparent_color = getattr(Qt.GlobalColor, 'transparent', getattr(Qt, 'transparent', None))
-    mosaic.fill(transparent_color)
+    mosaic.fill(Qt.GlobalColor.transparent)
 
     painter = QPainter(mosaic)
     tile_dir = os.path.join(temp_dir, f"tiles_{target_utc_str}")
@@ -231,10 +236,12 @@ def download_and_merge_tiles(base_utc_str, target_utc_str, extent_3857, zoom, te
             path = os.path.join(tile_dir, f"{tx}_{ty}.png")
 
             if not download_png(url, path):
+                print(f"Tile download failed: {url}")
                 continue
 
             img = QImage(path)
             if img.isNull():
+                print(f"Invalid tile image: {path}")
                 continue
 
             img = img.convertToFormat(QImage.Format.Format_ARGB32)
@@ -275,7 +282,7 @@ def create_geopackage_raster(mosaic_png, mosaic_bounds, extent_3857, target_utc_
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(3857)
     dst_ds.SetProjection(srs.ExportToWkt())
-    
+
     dst_ds.FlushCache()
     dst_ds = None
     src_ds = None
@@ -307,6 +314,7 @@ def add_gpkg_layer_with_temporal(gpkg_path, table_name, layer_name, jst_time, gr
     uri = f"GPKG:{gpkg_path}:{table_name}"
     layer = QgsRasterLayer(uri, layer_name, "gdal")
     if not layer.isValid():
+        print(f"Layer invalid: {uri}")
         return None
 
     layer.setOpacity(RASTER_OPACITY)
@@ -386,6 +394,7 @@ def run_nowcast_process(base_jst, hours_back, extent_3857):
             base_utc_str, target_utc_str, extent_3857, ZOOM_LEVEL, temp_dir
         )
         if not mosaic_png:
+            print(f"No mosaic for {target_utc_str}")
             continue
 
         table_name = create_geopackage_raster(
@@ -437,8 +446,8 @@ def run_nowcast_process(base_jst, hours_back, extent_3857):
 
         try:
             controller_widget.setAnimationMode()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Animation mode error: {e}")
 
     iface.mapCanvas().refresh()
 
@@ -463,11 +472,9 @@ class JPRaincloudradarDownloader:
         icon_path = os.path.join(self.plugin_dir, "icon.png")
         icon = QIcon(icon_path)
 
-        # アクション生成（アイコンを設定）
         self.action = QAction(icon, "JPRaincloudradarDownloader", self.iface.mainWindow())
         self.action.triggered.connect(self.show_panel)
 
-        # メニューおよびツールバーへ追加
         self.iface.addPluginToMenu("JPRaincloudradarDownloader", self.action)
         self.iface.addToolBarIcon(self.action)
 
@@ -483,7 +490,7 @@ class JPRaincloudradarDownloader:
         if self.dock is None:
             self.dock = JPRaincloudradarDownloaderDialog()
 
-            dock_area = getattr(Qt.DockWidgetArea, 'LeftDockWidgetArea', getattr(Qt, 'LeftDockWidgetArea', None))
+            dock_area = Qt.DockWidgetArea.LeftDockWidgetArea
             self.iface.addDockWidget(dock_area, self.dock)
 
             now = datetime.utcnow() + timedelta(hours=9)
@@ -495,11 +502,11 @@ class JPRaincloudradarDownloader:
             self.dock.lineEdit_hours_back.setText("1")
 
             canvas = iface.mapCanvas()
-
             self.dock.extentWidget.setMapCanvas(canvas)
             self.dock.extentWidget.setOutputExtentFromCurrent()
 
             self.dock.button_download.clicked.connect(self.start_download)
+            self.dock.button_download_lightning.clicked.connect(self.start_lightning_download)
 
         self.dock.show()
 
@@ -523,6 +530,20 @@ class JPRaincloudradarDownloader:
             extent_3857 = transform_rect_to_3857(rect, src_crs)
 
             run_nowcast_process(base_jst, hours_back, extent_3857)
+
+        except Exception as e:
+            QMessageBox.critical(self.iface.mainWindow(), "エラー", str(e))
+
+    def start_lightning_download(self):
+        try:
+            date = self.dock.dateEdit.date().toPyDate()
+            hour = int(self.dock.lineEdit_hour.text())
+            minute = int(self.dock.lineEdit_min.text())
+            hours_back = int(self.dock.lineEdit_hours_back.text())
+
+            base_jst = datetime(date.year, date.month, date.day, hour, minute, 0)
+
+            run_lightning_process(base_jst, hours_back)
 
         except Exception as e:
             QMessageBox.critical(self.iface.mainWindow(), "エラー", str(e))

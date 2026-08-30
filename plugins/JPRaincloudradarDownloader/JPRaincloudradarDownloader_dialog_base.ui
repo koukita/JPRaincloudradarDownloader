@@ -53,11 +53,16 @@
      <widget class="QgsExtentGroupBox" name="extentWidget"/>
     </item>
 
-    <item>
-     <widget class="QPushButton" name="button_download">
-      <property name="text"><string>データ取得</string></property>
-     </widget>
-    </item>
+      <item>
+         <widget class="QPushButton" name="button_download">
+         <property name="text"><string>雨雲レーダー画像取得</string></property>
+      </widget>
+      </item>
+      <item>
+         <widget class="QPushButton" name="button_download_lightning">
+         <property name="text"><string>雷データ取得</string></property>
+      </widget>
+      </item>
 
    </layout>
   </widget>
