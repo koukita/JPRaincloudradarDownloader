@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>JPRaincloudradarDownloaderDialogBase</class>
+ <widget class="QDockWidget" name="JPRaincloudradarDownloaderDock">
+  <property name="windowTitle">
+   <string>雨雲レーダー取得</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="verticalLayout">
+
+    <item>
+     <widget class="QLabel" name="label_info">
+      <property name="text">
+       <string>あらかじめプロジェクトファイルを保存してください。プロジェクトファイルと同じフォルダにGeopackageを作成します。未来予測は1時間先までダウンロードできます。</string>
+      </property>
+      <property name="wordWrap"><bool>true</bool></property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QLabel" name="label_info">
+      <property name="text">
+       <string>時系列パネルの時間は世界標準時なので、日本時間より9時間前になります。</string>
+      </property>
+      <property name="wordWrap"><bool>true</bool></property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QLabel" name="label_datetime">
+      <property name="text"><string>データ取得日時（JST）</string></property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QDateEdit" name="dateEdit">
+      <property name="calendarPopup"><bool>true</bool></property>
+     </widget>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout" name="timeLayout">
+      <item><widget class="QLineEdit" name="lineEdit_hour"/></item>
+      <item><widget class="QLabel" name="label_hour"><property name="text"><string>時</string></property></widget></item>
+      <item><widget class="QLineEdit" name="lineEdit_min"/></item>
+      <item><widget class="QLabel" name="label_min"><property name="text"><string>分</string></property></widget></item>
+      <item><widget class="QLineEdit" name="lineEdit_hours_back"/></item>
+      <item><widget class="QLabel" name="label_hours_back"><property name="text"><string>時間前まで取得</string></property></widget></item>
+     </layout>
+    </item>
+
+    <item>
+     <widget class="QgsExtentGroupBox" name="extentWidget"/>
+    </item>
+
+    <item>
+     <widget class="QPushButton" name="button_download">
+      <property name="text"><string>データ取得</string></property>
+     </widget>
+    </item>
+
+   </layout>
+  </widget>
+ </widget>
+
+ <customwidgets>
+    <customwidget>
+    <class>QgsExtentGroupBox</class>
+    <extends>QGroupBox</extends>
+    <header>qgis.gui</header>
+    </customwidget>
+ </customwidgets>
+
+ <resources/>
+ <connections/>
+</ui>
