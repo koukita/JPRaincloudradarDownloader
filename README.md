@@ -16,3 +16,6 @@
 をクリックすると、時間が更新されます。間隔を5分間隔にしてください。
 <img width="1522" height="161" alt="image" src="https://github.com/user-attachments/assets/ad6f9b64-1b68-4fe1-9a9a-ba0bfd6d0505" />
 ※時系列コントロールパネルの時間は世界標準時間なので、日本時間より9時間前になります。
+
+## 気象庁のデータ利用規約
+https://www.jma.go.jp/jma/kishou/info/coment.html
