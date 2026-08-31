@@ -19,9 +19,6 @@ from qgis.core import (
     QgsDateTimeRange,
     QgsInterval,
     Qgis,
-    QgsCategorizedSymbolRenderer,
-    QgsRendererCategory,
-    QgsMarkerSymbol
 )
 
 def process_events():
@@ -65,34 +62,11 @@ def make_jst_qdatetime(value, fallback):
     )
 
 def apply_lightning_style(layer):
-    """雷カテゴリに応じたスタイル設定（対地放電: 四角, 雲放電: バツ）"""
-    categories = []
-    
-    # 1) type = "0" : 対地放電（落雷） (黄色い四角)
-    symbol_0 = QgsMarkerSymbol.createSimple({
-        'name': 'square',
-        'color': '255,204,0',
-        'outline_color': '0,0,0',
-        'outline_width': '0.2',
-        'size': '4'
-    })
-    cat_0 = QgsRendererCategory("0", symbol_0, "対地放電（落雷）")
-    categories.append(cat_0)
-    
-    # 2) type = "4" : 雲放電 (45度回転させたバツ)
-    symbol_4 = QgsMarkerSymbol.createSimple({
-        'name': 'cross_fill',
-        'color': '255,204,0',
-        'outline_color': '0,0,0',
-        'outline_width': '0.2',
-        'size': '4',
-        'angle': '45'
-    })
-    cat_4 = QgsRendererCategory("4", symbol_4, "雲放電")
-    categories.append(cat_4)
-    
-    renderer = QgsCategorizedSymbolRenderer("type", categories)
-    layer.setRenderer(renderer)
+    """添付の雷スタイルを、属性に依存しない単一定義で適用する。"""
+    style_path = os.path.join(os.path.dirname(__file__), "styles", "lightning.qml")
+    error_message, success = layer.loadNamedStyle(style_path)
+    if not success:
+        raise RuntimeError(f"雷レイヤのスタイルを読み込めませんでした: {error_message}")
     layer.triggerRepaint()
 
 def run_lightning_process(base_jst, hours_back):
@@ -230,6 +204,8 @@ def run_lightning_process(base_jst, hours_back):
             tp = vector_layer.temporalProperties()
             tp.setMode(Qgis.VectorTemporalMode.FeatureDateTimeInstantFromField)
             tp.setStartField("obstimeUTC")
+            # このプロジェクトの時間単位（分）で、継続時間を10分に設定する。
+            tp.setFixedDuration(10)
             tp.setIsActive(True)
 
             # 3. マップに追加

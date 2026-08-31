@@ -1,7 +1,7 @@
 [general]
 name=JPRaincloudradarDownloader
 description=A plugin that retrieves Japan Meteorological Agency (JMA) Nowcast rain cloud radar data for a specified date and time and saves it to GeoPackage.
-version=0.9.4
+version=0.9.5
 qgisMinimumVersion=3.22
 qgisMaximumVersion=4.99
 author=koichi kita
@@ -17,6 +17,7 @@ tags=python, rain
 icon=icon.png
 
 changelog=
+    2026/08/31 0.9.5 雷のスタイルを変更。レイヤプロパティで継続時間を10分に自動設定
     2026/08/30 0.9.4 ズームレベルを設定できるように変更 
     2026/08/30 0.9.3 雷ナウキャストのデータをダウンロードできるように機能追加
     2026/08/30 0.9.2 プラグイン登録

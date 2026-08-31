@@ -2,7 +2,10 @@
 
 ## このプラグインについて
 気象庁が公開する雨雲レーダー画像をダウンロードして、Geopackageに保存し、時系列コントロールパネルでアニメーション化する事ができます。  
-![demo](/img/amagumo.gif)
+![demo](/img/amagumo01.gif)  
+  
+雷の位置をGeojsonでダウンロードすることもできます。
+![demo](/img/amagumo02.gif)  
 
 ## インストール方法
 インストール用ZIPファイル「JPRaincloudradarDownloader_x.x.zip」をダウンロードして、プラグインをインストールしてください。  
