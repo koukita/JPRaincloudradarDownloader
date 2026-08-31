@@ -105,6 +105,19 @@
             </property>
          </spacer>
          </item>
+         <item>
+          <widget class="QLabel" name="label_source">
+           <property name="text">
+            <string>出典：気象庁雨雲レーダー画像(&lt;a href="https://www.jma.go.jp/bosai/nowc/"&gt;https://www.jma.go.jp/bosai/nowc/&lt;/a&gt;)</string>
+           </property>
+           <property name="openExternalLinks">
+            <bool>true</bool>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
          </layout>
       </widget>
    </widget>
