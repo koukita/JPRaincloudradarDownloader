@@ -24,9 +24,7 @@ from qgis.core import (
     Qgis
 )
 
-from qgis.gui import QgsTemporalControllerWidget
 from qgis.utils import iface
-
 from .JPRaincloudradarDownloader_dialog import JPRaincloudradarDownloaderDialog
 from .LightningDataDownloader import run_lightning_process
 
@@ -43,6 +41,10 @@ WEB_MERCATOR_LIMIT = 20037508.342789244
 
 def process_events():
     QCoreApplication.processEvents()
+
+
+def get_temporal_controller():
+    return iface.mapCanvas().temporalController()
 
 
 def safe_get(url, timeout):
@@ -373,7 +375,7 @@ def run_nowcast_process(base_jst, hours_back, extent_3857, zoom):
         if progress.wasCanceled():
             break
 
-        target_utc_dt = jst_dt - timedelta(hours=9)
+        target_utc_dt = jst_dt  - timedelta(hours=9)
         target_utc_str = target_utc_dt.strftime("%Y%m%d%H%M%S")
 
         is_future = target_utc_dt > now_utc
@@ -421,9 +423,8 @@ def run_nowcast_process(base_jst, hours_back, extent_3857, zoom):
         temporal_dock.setVisible(True)
         temporal_dock.raise_()
 
-    controller_widget = iface.mainWindow().findChild(QgsTemporalControllerWidget)
-    if controller_widget:
-        controller = controller_widget.temporalController()
+    controller = get_temporal_controller()
+    if controller:
 
         start_qdt = QDateTime(
             time_steps[0].year, time_steps[0].month, time_steps[0].day,
@@ -437,16 +438,8 @@ def run_nowcast_process(base_jst, hours_back, extent_3857, zoom):
         total_range = QgsDateTimeRange(start_qdt, end_qdt)
         interval = QgsInterval(5, Qgis.TemporalUnit.Minutes)
 
-        controller.setFrameInterval(interval)
+        controller.setFrameDuration(interval)
         controller.setTemporalExtents(total_range)
-
-        controller_widget.setTemporalRange(total_range)
-        controller_widget.setTimeStep(interval)
-
-        try:
-            controller_widget.setAnimationMode()
-        except Exception as e:
-            print(f"Animation mode error: {e}")
 
     iface.mapCanvas().refresh()
 
@@ -503,6 +496,7 @@ class JPRaincloudradarDownloader:
 
             self.dock.button_download.clicked.connect(self.start_download)
             self.dock.button_download_lightning.clicked.connect(self.start_lightning_download)
+            self.dock.button_update_temporal_range.clicked.connect(self.update_temporal_range_utc)
 
         # パネルを開くたびに領域座標とズームレベルのみを更新
         canvas = iface.mapCanvas()
@@ -523,6 +517,34 @@ class JPRaincloudradarDownloader:
         self.dock.spinBox_zoom.setValue(default_zoom)
 
         self.dock.show()
+
+    def update_temporal_range_utc(self):
+        try:
+            controller = get_temporal_controller()
+            if controller is None:
+                raise RuntimeError(
+                    "時系列コントローラーを取得できません。時系列パネルが開いているか確認してください。"
+                )
+
+            current_range = controller.temporalExtents()
+            start = current_range.begin()
+            end = current_range.end()
+            if not start.isValid() or not end.isValid():
+                raise RuntimeError("時系列パネルの開始日時または終了日時が正しくありません。")
+
+            temporal_range = QgsDateTimeRange(
+                start.addSecs(-9 * 60 * 60),
+                end.addSecs(-9 * 60 * 60)
+            )
+            controller.setTemporalExtents(temporal_range)
+
+            temporal_dock = self.iface.mainWindow().findChild(QDockWidget, "TemporalController")
+            if temporal_dock:
+                temporal_dock.setVisible(True)
+                temporal_dock.raise_()
+
+        except Exception as e:
+            QMessageBox.critical(self.iface.mainWindow(), "エラー", str(e))
 
     def start_download(self):
         try:

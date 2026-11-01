@@ -91,6 +91,37 @@
             <property name="text"><string>雷データ取得</string></property>
          </widget>
          </item>
+      <item>
+         <spacer name="temporalButtonSpacer">
+            <property name="orientation">
+               <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeType">
+               <enum>QSizePolicy::Fixed</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+               <size>
+                  <width>20</width>
+                  <height>23</height>
+               </size>
+            </property>
+         </spacer>
+      </item>
+      <item>
+         <widget class="QPushButton" name="button_update_temporal_range">
+            <property name="text"><string>時系列パネルの日時を9時間前に変更</string></property>
+         </widget>
+      </item>
+      <item>
+         <widget class="QLabel" name="label_temporal_range_help">
+            <property name="text">
+               <string>このボタンをクリックすると、時系列コントローラのアニメーション範囲を9時間前に変更します。一度、アニメーション範囲の全範囲に設定ボタンをクリックして範囲を設定後にクリックしてください。</string>
+            </property>
+            <property name="wordWrap">
+               <bool>true</bool>
+            </property>
+         </widget>
+      </item>
 
          <item>
          <spacer name="verticalSpacer">

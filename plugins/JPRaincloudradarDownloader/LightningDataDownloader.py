@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 from qgis.PyQt.QtCore import QDate, QDateTime, QTime, QTimeZone, QCoreApplication, QVariant, Qt
 from qgis.PyQt.QtWidgets import QProgressDialog, QMessageBox, QDockWidget
-from qgis.gui import QgsTemporalControllerWidget
 from qgis.utils import iface
 
 from qgis.core import (
@@ -217,9 +216,8 @@ def run_lightning_process(base_jst, hours_back):
                 temporal_dock.setVisible(True)
                 temporal_dock.raise_()
 
-            controller_widget = iface.mainWindow().findChild(QgsTemporalControllerWidget)
-            if controller_widget:
-                controller = controller_widget.temporalController()
+            controller = iface.mapCanvas().temporalController()
+            if controller:
 
                 start_utc_dt = time_steps_jst[0] - timedelta(hours=9)
                 end_utc_dt = time_steps_jst[-1] - timedelta(hours=9)
@@ -230,16 +228,8 @@ def run_lightning_process(base_jst, hours_back):
                 total_range = QgsDateTimeRange(start_qdt, end_qdt)
                 interval = QgsInterval(5, Qgis.TemporalUnit.Minutes)
 
-                controller.setFrameInterval(interval)
+                controller.setFrameDuration(interval)
                 controller.setTemporalExtents(total_range)
-
-                controller_widget.setTemporalRange(total_range)
-                controller_widget.setTimeStep(interval)
-
-                try:
-                    controller_widget.setAnimationMode()
-                except Exception as e:
-                    print(f"Animation mode error: {e}")
 
             iface.mapCanvas().refresh()
 
