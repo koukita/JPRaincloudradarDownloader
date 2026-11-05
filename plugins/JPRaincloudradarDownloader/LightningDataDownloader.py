@@ -174,9 +174,9 @@ def run_lightning_process(base_jst, hours_back):
         options.fileEncoding = "UTF-8"
         
         if os.path.exists(gpkg_path):
-            options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+            options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
         else:
-            options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+            options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
 
         res = QgsVectorFileWriter.writeAsVectorFormatV3(
             combined_layer,
@@ -188,7 +188,7 @@ def run_lightning_process(base_jst, hours_back):
         err = res[0]
         err_msg = res[1] if len(res) > 1 else ""
 
-        if err != QgsVectorFileWriter.NoError:
+        if err != QgsVectorFileWriter.WriterError.NoError:
             raise RuntimeError(f"GeoPackageの保存に失敗しました: {err_msg}")
 
         # エクスポートしたGeoPackageから描画用レイヤを読み込み
